@@ -1,5 +1,7 @@
 # FLC_intron1_model_fitting
-Python code and associated data files used to perform parameter inference for the intronic RNA model and other data analysis in Maple et al., 2025. Primer tables also included.  
+Python code and associated data files used to perform parameter inference for the intronic RNA model and other data analysis in Maple et al., 2025. Primer tables also included.
+
+smFISH_data.zip contains an Excel file that includes the mRNA counts per unit area for FLC and PP2A, obtained from analysis of the smFISH images as described in the Methods section of the paper.
 
 The Jupyter notebooks provided can be used to generate the following plots presented in the paper:  
 
