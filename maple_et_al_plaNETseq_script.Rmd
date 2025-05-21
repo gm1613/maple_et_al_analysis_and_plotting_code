@@ -1,0 +1,1490 @@
+---
+title: "Rob_paper_script"
+output: html_document
+date: "2025-05-19"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r Libraries, include = FALSE}
+library(tidyverse)
+library(readr)
+library(ggpubr)
+library(data.table)
+library(tidyr)
+library(dplyr)
+library(tidyr)
+library(data.table)
+library(ggplot2)
+library(zoo)
+library(stringr)
+library(patchwork)
+library(ggtext)
+library(ggstance)
+library(ggpubr)
+library(ggbreak)
+library(markdown)
+library(scales)
+```
+
+
+```{r FLC/ACT7/UBC21 locus positions}
+FLC_positions_NETseq <- data.table(nt_pos=rep(seq(3172382, 3181982)))
+FLC_positions_NETseq <- tibble(FLC_positions_NETseq)
+
+ACT7_positions_NETseq <- data.table(nt_pos=rep(seq(3051862, 3055191)))
+ACT7_positions_NETseq <- tibble(ACT7_positions_NETseq)
+
+UBC21_positions_NETseq <- data.table(nt_pos=rep(seq(8967455, 8969849)))
+UBC21_positions_NETseq <- tibble(UBC21_positions_NETseq)
+```
+
+#Load files - bed files obtained from converting fully processed and filtered bam files
+```{r}
+#prefix to load files
+a = c("Col-0_NV_rep1","Col-0_NV_rep2","Col-0_NV_rep3","Col-0_NV_rep4",
+      "ColFRI_NV_rep1","ColFRI_NV_rep2","ColFRI_NV_rep3","ColFRI_NV_rep4",
+      "ColFRI_1W_rep1","ColFRI_1W_rep2","ColFRI_1W_rep3","ColFRI_1W_rep4",
+      "ColFRI_2W_rep1","ColFRI_2W_rep2","ColFRI_2W_rep3","ColFRI_2W_rep4",
+      "ColFRI_4W_rep1","ColFRI_4W_rep2","ColFRI_4W_rep3","ColFRI_4W_rep4",
+      "ColFRI_T10_rep1","ColFRI_T10_rep2","ColFRI_T10_rep3","ColFRI_T10_rep4")
+
+#prefix to name dataframes
+b = c("Col_NV_rep1","Col_NV_rep2","Col_NV_rep3","Col_NV_rep4",
+      "FRI_NV_rep1","FRI_NV_rep2","FRI_NV_rep3","FRI_NV_rep4",
+      "FRI_1W_rep1","FRI_1W_rep2","FRI_1W_rep3","FRI_1W_rep4",
+      "FRI_2W_rep1","FRI_2W_rep2","FRI_2W_rep3","FRI_2W_rep4",
+      "FRI_4W_rep1","FRI_4W_rep2","FRI_4W_rep3","FRI_4W_rep4",
+      "FRI_4W10_rep1","FRI_4W10_rep2","FRI_4W10_rep3","FRI_4W10_rep4")
+```
+
+
+```{r Load FLC sense bed files}
+
+  
+for (i in 1:24) {
+
+      file_path <- paste0("/PATH/", a[i], "_reverse.bed")
+      
+  NET_dat <- read.delim(file_path, header=FALSE) %>% 
+    filter(V1 == "Chr5", V2 %in% c(3172382:3180448)) %>% 
+    select(V2, V4) %>% 
+    mutate(nt_pos = V2+1, read_id = V4) %>% 
+    group_by(nt_pos) %>% 
+    summarise(counts = n()) %>% 
+    mutate(norm_counts = counts / sum(counts))
+  
+    assign(paste0("NETseq_", b[i], "_sense"), NET_dat)
+  
+  NET_dat_all_nt <- merge(FLC_positions_NETseq, NET_dat, by="nt_pos", all=TRUE) %>% 
+    mutate(
+      norm_counts = replace_na(norm_counts, 0.00001), 
+      counts = replace_na(counts, 0)
+    ) %>% mutate(rollmean_counts = rollmean(norm_counts, 10, fill=0.00001), strand = "sense")
+  assign(paste0("NETseq_", b[i], "_sense_all_nt"), NET_dat_all_nt)
+}
+```
+
+```{r Load ACT7 sense bed files}
+for (i in 1:24) {
+  
+      file_path <- paste0("/PATH/", a[i], "_forward.bed")
+
+  NET_dat <- read.delim(file_path, header=FALSE) %>% 
+    filter(V1 == "Chr5", V3 %in% c(3052062:3055191)) %>% 
+    select(V3, V4) %>% 
+    mutate(nt_pos = V3, read_id = V4) %>% 
+     filter(!(nt_pos %in% act7_splice)) %>%
+    group_by(nt_pos) %>% 
+    summarise(counts = n()) %>% 
+    mutate(norm_counts = counts / sum(counts))
+  
+    assign(paste0("NETseq_", b[i], "_sense"), NET_dat)
+  
+  NET_dat_all_nt <- merge(ACT7_positions_NETseq, NET_dat, by="nt_pos", all=TRUE) %>% 
+    mutate(
+      norm_counts = replace_na(norm_counts, 0.00001), 
+      counts = replace_na(counts, 0)
+    ) %>% mutate(rollmean_counts = rollmean(norm_counts, 10, fill=0.00001), strand = "sense")
+  assign(paste0("ACT7_NETseq_", b[i], "_sense_all_nt"), NET_dat_all_nt)
+}
+
+```
+
+```{r Load UBC21 sense bed files}
+for (i in 1:24) {
+  
+      file_path <- paste0("/PATH/", a[i], "_forward.bed")
+
+  NET_dat <- read.delim(file_path, header=FALSE) %>% 
+    filter(V1 == "Chr5", V3 %in% c(8967655:8969849)) %>% 
+    select(V3, V4) %>% 
+    mutate(nt_pos = V3, read_id = V4) %>% 
+         filter(!(nt_pos %in% ubc21_splice)) %>%
+    group_by(nt_pos) %>% 
+    summarise(counts = n()) %>% 
+    mutate(norm_counts = counts / sum(counts))
+  
+    assign(paste0("NETseq_", b[i], "_sense"), NET_dat)
+  
+  NET_dat_all_nt <- merge(UBC21_positions_NETseq, NET_dat, by="nt_pos", all=TRUE) %>% 
+    mutate(
+      norm_counts = replace_na(norm_counts, 0.00001), 
+      counts = replace_na(counts, 0)
+    ) %>% mutate(rollmean_counts = rollmean(norm_counts, 10, fill=0.00001), strand = "sense")
+  assign(paste0("UBC21_NETseq_", b[i], "_sense_all_nt"), NET_dat_all_nt)
+}
+
+```
+
+
+#Normalize counts and calculate average
+
+```{r Calculate geometric mean of ACT7 and UBC21 for each condition in each rep}
+  NETseq_geommean_act7ubc21_rep1 = c(
+    sqrt(sum(ACT7_NETseq_Col_NV_rep1_sense_all_nt$counts)*sum(UBC21_NETseq_Col_NV_rep1_sense_all_nt$counts)),
+    
+    sqrt(sum(ACT7_NETseq_FRI_NV_rep1_sense_all_nt$counts)*sum(UBC21_NETseq_FRI_NV_rep1_sense_all_nt$counts)),
+    sqrt(sum(ACT7_NETseq_FRI_1W_rep1_sense_all_nt$counts)*sum(UBC21_NETseq_FRI_1W_rep1_sense_all_nt$counts)),
+    sqrt(sum(ACT7_NETseq_FRI_2W_rep1_sense_all_nt$counts)*sum(UBC21_NETseq_FRI_2W_rep1_sense_all_nt$counts)),
+    sqrt(sum(ACT7_NETseq_FRI_4W_rep1_sense_all_nt$counts)*sum(UBC21_NETseq_FRI_4W_rep1_sense_all_nt$counts)),
+    sqrt(sum(ACT7_NETseq_FRI_4W10_rep1_sense_all_nt$counts)*sum(UBC21_NETseq_FRI_4W10_rep1_sense_all_nt$counts))
+  )
+  
+  
+  NETseq_geommean_act7ubc21_rep2 = c(
+    sqrt(sum(ACT7_NETseq_Col_NV_rep2_sense_all_nt$counts)*sum(UBC21_NETseq_Col_NV_rep2_sense_all_nt$counts)),
+    
+    sqrt(sum(ACT7_NETseq_FRI_NV_rep2_sense_all_nt$counts)*sum(UBC21_NETseq_FRI_NV_rep2_sense_all_nt$counts)),
+    sqrt(sum(ACT7_NETseq_FRI_1W_rep2_sense_all_nt$counts)*sum(UBC21_NETseq_FRI_1W_rep2_sense_all_nt$counts)),
+    sqrt(sum(ACT7_NETseq_FRI_2W_rep2_sense_all_nt$counts)*sum(UBC21_NETseq_FRI_2W_rep2_sense_all_nt$counts)),
+    sqrt(sum(ACT7_NETseq_FRI_4W_rep2_sense_all_nt$counts)*sum(UBC21_NETseq_FRI_4W_rep2_sense_all_nt$counts)),
+    sqrt(sum(ACT7_NETseq_FRI_4W10_rep2_sense_all_nt$counts)*sum(UBC21_NETseq_FRI_4W10_rep2_sense_all_nt$counts))
+  )
+  
+  
+  NETseq_geommean_act7ubc21_rep3 = c(
+    sqrt(sum(ACT7_NETseq_Col_NV_rep3_sense_all_nt$counts)*sum(UBC21_NETseq_Col_NV_rep3_sense_all_nt$counts)),
+    
+    sqrt(sum(ACT7_NETseq_FRI_NV_rep3_sense_all_nt$counts)*sum(UBC21_NETseq_FRI_NV_rep3_sense_all_nt$counts)),
+    sqrt(sum(ACT7_NETseq_FRI_1W_rep3_sense_all_nt$counts)*sum(UBC21_NETseq_FRI_1W_rep3_sense_all_nt$counts)),
+    sqrt(sum(ACT7_NETseq_FRI_2W_rep3_sense_all_nt$counts)*sum(UBC21_NETseq_FRI_2W_rep3_sense_all_nt$counts)),
+    sqrt(sum(ACT7_NETseq_FRI_4W_rep3_sense_all_nt$counts)*sum(UBC21_NETseq_FRI_4W_rep3_sense_all_nt$counts)),
+    sqrt(sum(ACT7_NETseq_FRI_4W10_rep3_sense_all_nt$counts)*sum(UBC21_NETseq_FRI_4W10_rep3_sense_all_nt$counts))
+  )
+  
+  
+  NETseq_geommean_act7ubc21_rep4 = c(
+    sqrt(sum(ACT7_NETseq_Col_NV_rep4_sense_all_nt$counts)*sum(UBC21_NETseq_Col_NV_rep4_sense_all_nt$counts)),
+    
+    sqrt(sum(ACT7_NETseq_FRI_NV_rep4_sense_all_nt$counts)*sum(UBC21_NETseq_FRI_NV_rep4_sense_all_nt$counts)),
+    sqrt(sum(ACT7_NETseq_FRI_1W_rep4_sense_all_nt$counts)*sum(UBC21_NETseq_FRI_1W_rep4_sense_all_nt$counts)),
+    sqrt(sum(ACT7_NETseq_FRI_2W_rep4_sense_all_nt$counts)*sum(UBC21_NETseq_FRI_2W_rep4_sense_all_nt$counts)),
+    sqrt(sum(ACT7_NETseq_FRI_4W_rep4_sense_all_nt$counts)*sum(UBC21_NETseq_FRI_4W_rep4_sense_all_nt$counts)),
+    sqrt(sum(ACT7_NETseq_FRI_4W10_rep4_sense_all_nt$counts)*sum(UBC21_NETseq_FRI_4W10_rep4_sense_all_nt$counts))
+  )
+  
+  
+```
+
+
+```{r Calculate FLC sense and antisense counts normalized to geom mean of ACT7 and UBC21}
+
+#rep1 sense
+
+NETseq_Col_NV_rep1_sense_all_nt = NETseq_Col_NV_rep1_sense_all_nt %>% 
+  mutate(norm_to_act7ubc21 = counts/NETseq_geommean_act7ubc21_rep1[1]) %>%
+  mutate(norm_to_act7ubc21 = if_else(norm_to_act7ubc21 == 0, 0.00001, norm_to_act7ubc21)) %>% 
+  mutate(rollmean_to_act7ubc21 = rollmean(norm_to_act7ubc21, 10, fill=0.00001),
+         biorep = "rep1",
+         condition = "Col-0"
+  )
+
+NETseq_FRI_NV_rep1_sense_all_nt = NETseq_FRI_NV_rep1_sense_all_nt %>% 
+  mutate(norm_to_act7ubc21 = counts/NETseq_geommean_act7ubc21_rep1[2]) %>%
+  mutate(norm_to_act7ubc21 = if_else(norm_to_act7ubc21 == 0, 0.00001, norm_to_act7ubc21)) %>% 
+  mutate(rollmean_to_act7ubc21 = rollmean(norm_to_act7ubc21, 10, fill=0.00001),
+         biorep = "rep1",
+         condition = "NV"
+  )
+
+NETseq_FRI_1W_rep1_sense_all_nt = NETseq_FRI_1W_rep1_sense_all_nt %>% 
+  mutate(norm_to_act7ubc21 = counts/NETseq_geommean_act7ubc21_rep1[3]) %>%
+  mutate(norm_to_act7ubc21 = if_else(norm_to_act7ubc21 == 0, 0.00001, norm_to_act7ubc21)) %>% 
+  mutate(rollmean_to_act7ubc21 = rollmean(norm_to_act7ubc21, 10, fill=0.00001),
+         biorep = "rep1",
+         condition = "1W"
+  )
+
+NETseq_FRI_2W_rep1_sense_all_nt = NETseq_FRI_2W_rep1_sense_all_nt %>% 
+  mutate(norm_to_act7ubc21 = counts/NETseq_geommean_act7ubc21_rep1[4]) %>%
+  mutate(norm_to_act7ubc21 = if_else(norm_to_act7ubc21 == 0, 0.00001, norm_to_act7ubc21)) %>% 
+  mutate(rollmean_to_act7ubc21 = rollmean(norm_to_act7ubc21, 10, fill=0.00001),
+         biorep = "rep1",
+         condition = "2W"
+  )
+
+NETseq_FRI_4W_rep1_sense_all_nt = NETseq_FRI_4W_rep1_sense_all_nt %>% 
+  mutate(norm_to_act7ubc21 = counts/NETseq_geommean_act7ubc21_rep1[5]) %>%
+  mutate(norm_to_act7ubc21 = if_else(norm_to_act7ubc21 == 0, 0.00001, norm_to_act7ubc21)) %>% 
+  mutate(rollmean_to_act7ubc21 = rollmean(norm_to_act7ubc21, 10, fill=0.00001),
+         biorep = "rep1",
+         condition = "4W"
+  )
+
+
+NETseq_FRI_4W10_rep1_sense_all_nt = NETseq_FRI_4W10_rep1_sense_all_nt %>% 
+  mutate(norm_to_act7ubc21 = counts/NETseq_geommean_act7ubc21_rep1[6]) %>%
+  mutate(norm_to_act7ubc21 = if_else(norm_to_act7ubc21 == 0, 0.00001, norm_to_act7ubc21)) %>% 
+  mutate(rollmean_to_act7ubc21 = rollmean(norm_to_act7ubc21, 10, fill=0.00001),
+         biorep = "rep1",
+         condition = "4W10"
+  )
+
+
+
+
+#rep2 sense
+
+NETseq_Col_NV_rep2_sense_all_nt = NETseq_Col_NV_rep2_sense_all_nt %>% 
+  mutate(norm_to_act7ubc21 = counts/NETseq_geommean_act7ubc21_rep2[1]) %>%
+  mutate(norm_to_act7ubc21 = if_else(norm_to_act7ubc21 == 0, 0.00001, norm_to_act7ubc21)) %>% 
+  mutate(rollmean_to_act7ubc21 = rollmean(norm_to_act7ubc21, 10, fill=0.00001),
+         biorep = "rep2",
+         condition = "Col-0"
+  )
+
+NETseq_FRI_NV_rep2_sense_all_nt = NETseq_FRI_NV_rep2_sense_all_nt %>% 
+  mutate(norm_to_act7ubc21 = counts/NETseq_geommean_act7ubc21_rep2[2]) %>%
+  mutate(norm_to_act7ubc21 = if_else(norm_to_act7ubc21 == 0, 0.00001, norm_to_act7ubc21)) %>% 
+  mutate(rollmean_to_act7ubc21 = rollmean(norm_to_act7ubc21, 10, fill=0.00001),
+         biorep = "rep2",
+         condition = "NV"
+  )
+
+NETseq_FRI_1W_rep2_sense_all_nt = NETseq_FRI_1W_rep2_sense_all_nt %>% 
+  mutate(norm_to_act7ubc21 = counts/NETseq_geommean_act7ubc21_rep2[3]) %>%
+  mutate(norm_to_act7ubc21 = if_else(norm_to_act7ubc21 == 0, 0.00001, norm_to_act7ubc21)) %>% 
+  mutate(rollmean_to_act7ubc21 = rollmean(norm_to_act7ubc21, 10, fill=0.00001),
+         biorep = "rep2",
+         condition = "1W"
+  )
+
+NETseq_FRI_2W_rep2_sense_all_nt = NETseq_FRI_2W_rep2_sense_all_nt %>% 
+  mutate(norm_to_act7ubc21 = counts/NETseq_geommean_act7ubc21_rep2[4]) %>%
+  mutate(norm_to_act7ubc21 = if_else(norm_to_act7ubc21 == 0, 0.00001, norm_to_act7ubc21)) %>% 
+  mutate(rollmean_to_act7ubc21 = rollmean(norm_to_act7ubc21, 10, fill=0.00001),
+         biorep = "rep2",
+         condition = "2W"
+  )
+
+NETseq_FRI_4W_rep2_sense_all_nt = NETseq_FRI_4W_rep2_sense_all_nt %>% 
+  mutate(norm_to_act7ubc21 = counts/NETseq_geommean_act7ubc21_rep2[5]) %>%
+  mutate(norm_to_act7ubc21 = if_else(norm_to_act7ubc21 == 0, 0.00001, norm_to_act7ubc21)) %>% 
+  mutate(rollmean_to_act7ubc21 = rollmean(norm_to_act7ubc21, 10, fill=0.00001),
+         biorep = "rep2",
+         condition = "4W"
+  )
+
+
+NETseq_FRI_4W10_rep2_sense_all_nt = NETseq_FRI_4W10_rep2_sense_all_nt %>% 
+  mutate(norm_to_act7ubc21 = counts/NETseq_geommean_act7ubc21_rep2[6]) %>%
+  mutate(norm_to_act7ubc21 = if_else(norm_to_act7ubc21 == 0, 0.00001, norm_to_act7ubc21)) %>% 
+  mutate(rollmean_to_act7ubc21 = rollmean(norm_to_act7ubc21, 10, fill=0.00001),
+         biorep = "rep2",
+         condition = "4W10"
+  )
+
+
+
+#rep3 sense
+
+NETseq_Col_NV_rep3_sense_all_nt = NETseq_Col_NV_rep3_sense_all_nt %>% 
+  mutate(norm_to_act7ubc21 = counts/NETseq_geommean_act7ubc21_rep3[1]) %>%
+  mutate(norm_to_act7ubc21 = if_else(norm_to_act7ubc21 == 0, 0.00001, norm_to_act7ubc21)) %>% 
+  mutate(rollmean_to_act7ubc21 = rollmean(norm_to_act7ubc21, 10, fill=0.00001),
+         biorep = "rep3",
+         condition = "Col-0"
+  )
+
+NETseq_FRI_NV_rep3_sense_all_nt = NETseq_FRI_NV_rep3_sense_all_nt %>% 
+  mutate(norm_to_act7ubc21 = counts/NETseq_geommean_act7ubc21_rep3[2]) %>%
+  mutate(norm_to_act7ubc21 = if_else(norm_to_act7ubc21 == 0, 0.00001, norm_to_act7ubc21)) %>% 
+  mutate(rollmean_to_act7ubc21 = rollmean(norm_to_act7ubc21, 10, fill=0.00001),
+         biorep = "rep3",
+         condition = "NV"
+  )
+
+NETseq_FRI_1W_rep3_sense_all_nt = NETseq_FRI_1W_rep3_sense_all_nt %>% 
+  mutate(norm_to_act7ubc21 = counts/NETseq_geommean_act7ubc21_rep3[3]) %>%
+  mutate(norm_to_act7ubc21 = if_else(norm_to_act7ubc21 == 0, 0.00001, norm_to_act7ubc21)) %>% 
+  mutate(rollmean_to_act7ubc21 = rollmean(norm_to_act7ubc21, 10, fill=0.00001),
+         biorep = "rep3",
+         condition = "1W"
+  )
+
+NETseq_FRI_2W_rep3_sense_all_nt = NETseq_FRI_2W_rep3_sense_all_nt %>% 
+  mutate(norm_to_act7ubc21 = counts/NETseq_geommean_act7ubc21_rep3[4]) %>%
+  mutate(norm_to_act7ubc21 = if_else(norm_to_act7ubc21 == 0, 0.00001, norm_to_act7ubc21)) %>% 
+  mutate(rollmean_to_act7ubc21 = rollmean(norm_to_act7ubc21, 10, fill=0.00001),
+         biorep = "rep3",
+         condition = "2W"
+  )
+
+NETseq_FRI_4W_rep3_sense_all_nt = NETseq_FRI_4W_rep3_sense_all_nt %>% 
+  mutate(norm_to_act7ubc21 = counts/NETseq_geommean_act7ubc21_rep3[5]) %>%
+  mutate(norm_to_act7ubc21 = if_else(norm_to_act7ubc21 == 0, 0.00001, norm_to_act7ubc21)) %>% 
+  mutate(rollmean_to_act7ubc21 = rollmean(norm_to_act7ubc21, 10, fill=0.00001),
+         biorep = "rep3",
+         condition = "4W"
+  )
+
+
+NETseq_FRI_4W10_rep3_sense_all_nt = NETseq_FRI_4W10_rep3_sense_all_nt %>% 
+  mutate(norm_to_act7ubc21 = counts/NETseq_geommean_act7ubc21_rep3[6]) %>%
+  mutate(norm_to_act7ubc21 = if_else(norm_to_act7ubc21 == 0, 0.00001, norm_to_act7ubc21)) %>% 
+  mutate(rollmean_to_act7ubc21 = rollmean(norm_to_act7ubc21, 10, fill=0.00001),
+         biorep = "rep3",
+         condition = "4W10"
+  )
+
+
+
+#rep4 sense
+
+NETseq_Col_NV_rep4_sense_all_nt = NETseq_Col_NV_rep4_sense_all_nt %>% 
+  mutate(norm_to_act7ubc21 = counts/NETseq_geommean_act7ubc21_rep4[1]) %>%
+  mutate(norm_to_act7ubc21 = if_else(norm_to_act7ubc21 == 0, 0.00001, norm_to_act7ubc21)) %>% 
+  mutate(rollmean_to_act7ubc21 = rollmean(norm_to_act7ubc21, 10, fill=0.00001),
+         biorep = "rep4",
+         condition = "Col-0"
+  )
+
+NETseq_FRI_NV_rep4_sense_all_nt = NETseq_FRI_NV_rep4_sense_all_nt %>% 
+  mutate(norm_to_act7ubc21 = counts/NETseq_geommean_act7ubc21_rep4[2]) %>%
+  mutate(norm_to_act7ubc21 = if_else(norm_to_act7ubc21 == 0, 0.00001, norm_to_act7ubc21)) %>% 
+  mutate(rollmean_to_act7ubc21 = rollmean(norm_to_act7ubc21, 10, fill=0.00001),
+         biorep = "rep4",
+         condition = "NV"
+  )
+
+NETseq_FRI_1W_rep4_sense_all_nt = NETseq_FRI_1W_rep4_sense_all_nt %>% 
+  mutate(norm_to_act7ubc21 = counts/NETseq_geommean_act7ubc21_rep4[3]) %>%
+  mutate(norm_to_act7ubc21 = if_else(norm_to_act7ubc21 == 0, 0.00001, norm_to_act7ubc21)) %>% 
+  mutate(rollmean_to_act7ubc21 = rollmean(norm_to_act7ubc21, 10, fill=0.00001),
+         biorep = "rep4",
+         condition = "1W"
+  )
+
+NETseq_FRI_2W_rep4_sense_all_nt = NETseq_FRI_2W_rep4_sense_all_nt %>% 
+  mutate(norm_to_act7ubc21 = counts/NETseq_geommean_act7ubc21_rep4[4]) %>%
+  mutate(norm_to_act7ubc21 = if_else(norm_to_act7ubc21 == 0, 0.00001, norm_to_act7ubc21)) %>% 
+  mutate(rollmean_to_act7ubc21 = rollmean(norm_to_act7ubc21, 10, fill=0.00001),
+         biorep = "rep4",
+         condition = "2W"
+  )
+
+NETseq_FRI_4W_rep4_sense_all_nt = NETseq_FRI_4W_rep4_sense_all_nt %>% 
+  mutate(norm_to_act7ubc21 = counts/NETseq_geommean_act7ubc21_rep4[5]) %>%
+  mutate(norm_to_act7ubc21 = if_else(norm_to_act7ubc21 == 0, 0.00001, norm_to_act7ubc21)) %>% 
+  mutate(rollmean_to_act7ubc21 = rollmean(norm_to_act7ubc21, 10, fill=0.00001),
+         biorep = "rep4",
+         condition = "4W"
+  )
+
+
+NETseq_FRI_4W10_rep4_sense_all_nt = NETseq_FRI_4W10_rep4_sense_all_nt %>% 
+  mutate(norm_to_act7ubc21 = counts/NETseq_geommean_act7ubc21_rep4[6]) %>%
+  mutate(norm_to_act7ubc21 = if_else(norm_to_act7ubc21 == 0, 0.00001, norm_to_act7ubc21)) %>% 
+  mutate(rollmean_to_act7ubc21 = rollmean(norm_to_act7ubc21, 10, fill=0.00001),
+         biorep = "rep4",
+         condition = "4W10"
+  )
+
+```
+
+
+```{r Calculate average across reps for sense}
+#NV-Col
+NETseq_Col_NV_AVERAGE_sense_all_nt = NETseq_Col_NV_rep2_sense_all_nt %>% select(nt_pos, strand) %>% 
+  mutate(counts =  rowMeans(
+    cbind(
+      NETseq_Col_NV_rep1_sense_all_nt$counts,
+      NETseq_Col_NV_rep2_sense_all_nt$counts,
+      NETseq_Col_NV_rep3_sense_all_nt$counts,
+      NETseq_Col_NV_rep4_sense_all_nt$counts
+    ), na.rm = TRUE)) %>%  
+  mutate(norm_counts =  rowMeans(
+    cbind(
+      NETseq_Col_NV_rep1_sense_all_nt$norm_counts,
+      NETseq_Col_NV_rep2_sense_all_nt$norm_counts,
+      NETseq_Col_NV_rep3_sense_all_nt$norm_counts,
+      NETseq_Col_NV_rep4_sense_all_nt$norm_counts
+    ), na.rm = TRUE)) %>% 
+  mutate(rollmean_counts =  rowMeans(
+    cbind(
+      NETseq_Col_NV_rep1_sense_all_nt$rollmean_counts,
+      NETseq_Col_NV_rep2_sense_all_nt$rollmean_counts,
+      NETseq_Col_NV_rep3_sense_all_nt$rollmean_counts,
+      NETseq_Col_NV_rep4_sense_all_nt$rollmean_counts
+    ), na.rm = TRUE)) %>% 
+  mutate(norm_to_act7ubc21 =  rowMeans(
+    cbind(
+      NETseq_Col_NV_rep1_sense_all_nt$norm_to_act7ubc21,
+      NETseq_Col_NV_rep2_sense_all_nt$norm_to_act7ubc21,
+      NETseq_Col_NV_rep3_sense_all_nt$norm_to_act7ubc21,
+      NETseq_Col_NV_rep4_sense_all_nt$norm_to_act7ubc21
+    ), na.rm = TRUE)) %>% 
+  mutate(rollmean_to_act7ubc21 =  rowMeans(
+    cbind(
+      NETseq_Col_NV_rep1_sense_all_nt$rollmean_to_act7ubc21,
+      NETseq_Col_NV_rep2_sense_all_nt$rollmean_to_act7ubc21,
+      NETseq_Col_NV_rep3_sense_all_nt$rollmean_to_act7ubc21,
+      NETseq_Col_NV_rep4_sense_all_nt$rollmean_to_act7ubc21
+    ), na.rm = TRUE)) %>% 
+  mutate(treatment = "Col-0")
+
+
+#NV
+NETseq_FRI_NV_AVERAGE_sense_all_nt = NETseq_FRI_NV_rep2_sense_all_nt %>% select(nt_pos, strand) %>% 
+  mutate(counts =  rowMeans(
+    cbind(
+      NETseq_FRI_NV_rep1_sense_all_nt$counts,
+      NETseq_FRI_NV_rep2_sense_all_nt$counts,
+      NETseq_FRI_NV_rep3_sense_all_nt$counts,
+      NETseq_FRI_NV_rep4_sense_all_nt$counts
+    ), na.rm = TRUE)) %>%  
+  mutate(norm_counts =  rowMeans(
+    cbind(
+      NETseq_FRI_NV_rep1_sense_all_nt$norm_counts,
+      NETseq_FRI_NV_rep2_sense_all_nt$norm_counts,
+      NETseq_FRI_NV_rep3_sense_all_nt$norm_counts,
+      NETseq_FRI_NV_rep4_sense_all_nt$norm_counts
+    ), na.rm = TRUE)) %>% 
+  mutate(rollmean_counts =  rowMeans(
+    cbind(
+      NETseq_FRI_NV_rep1_sense_all_nt$rollmean_counts,
+      NETseq_FRI_NV_rep2_sense_all_nt$rollmean_counts,
+      NETseq_FRI_NV_rep3_sense_all_nt$rollmean_counts,
+      NETseq_FRI_NV_rep4_sense_all_nt$rollmean_counts
+    ), na.rm = TRUE)) %>% 
+  mutate(norm_to_act7ubc21 =  rowMeans(
+    cbind(
+      NETseq_FRI_NV_rep1_sense_all_nt$norm_to_act7ubc21,
+      NETseq_FRI_NV_rep2_sense_all_nt$norm_to_act7ubc21,
+      NETseq_FRI_NV_rep3_sense_all_nt$norm_to_act7ubc21,
+      NETseq_FRI_NV_rep4_sense_all_nt$norm_to_act7ubc21
+    ), na.rm = TRUE)) %>% 
+  mutate(rollmean_to_act7ubc21 =  rowMeans(
+    cbind(
+      NETseq_FRI_NV_rep1_sense_all_nt$rollmean_to_act7ubc21,
+      NETseq_FRI_NV_rep2_sense_all_nt$rollmean_to_act7ubc21,
+      NETseq_FRI_NV_rep3_sense_all_nt$rollmean_to_act7ubc21,
+      NETseq_FRI_NV_rep4_sense_all_nt$rollmean_to_act7ubc21
+    ), na.rm = TRUE)) %>% 
+  mutate(treatment = "NV")
+
+
+#1W
+NETseq_FRI_1W_AVERAGE_sense_all_nt = NETseq_FRI_1W_rep2_sense_all_nt %>% select(nt_pos, strand) %>% 
+  mutate(counts =  rowMeans(
+    cbind(
+      NETseq_FRI_1W_rep1_sense_all_nt$counts,
+      NETseq_FRI_1W_rep2_sense_all_nt$counts,
+      NETseq_FRI_1W_rep3_sense_all_nt$counts,
+      NETseq_FRI_1W_rep4_sense_all_nt$counts
+    ), na.rm = TRUE)) %>%  
+  mutate(norm_counts =  rowMeans(
+    cbind(
+      NETseq_FRI_1W_rep1_sense_all_nt$norm_counts,
+      NETseq_FRI_1W_rep2_sense_all_nt$norm_counts,
+      NETseq_FRI_1W_rep3_sense_all_nt$norm_counts,
+      NETseq_FRI_1W_rep4_sense_all_nt$norm_counts
+    ), na.rm = TRUE)) %>% 
+  mutate(rollmean_counts =  rowMeans(
+    cbind(
+      NETseq_FRI_1W_rep1_sense_all_nt$rollmean_counts,
+      NETseq_FRI_1W_rep2_sense_all_nt$rollmean_counts,
+      NETseq_FRI_1W_rep3_sense_all_nt$rollmean_counts,
+      NETseq_FRI_1W_rep4_sense_all_nt$rollmean_counts
+    ), na.rm = TRUE)) %>% 
+  mutate(norm_to_act7ubc21 =  rowMeans(
+    cbind(
+      NETseq_FRI_1W_rep1_sense_all_nt$norm_to_act7ubc21,
+      NETseq_FRI_1W_rep2_sense_all_nt$norm_to_act7ubc21,
+      NETseq_FRI_1W_rep3_sense_all_nt$norm_to_act7ubc21,
+      NETseq_FRI_1W_rep4_sense_all_nt$norm_to_act7ubc21
+    ), na.rm = TRUE)) %>% 
+  mutate(rollmean_to_act7ubc21 =  rowMeans(
+    cbind(
+      NETseq_FRI_1W_rep1_sense_all_nt$rollmean_to_act7ubc21,
+      NETseq_FRI_1W_rep2_sense_all_nt$rollmean_to_act7ubc21,
+      NETseq_FRI_1W_rep3_sense_all_nt$rollmean_to_act7ubc21,
+      NETseq_FRI_1W_rep4_sense_all_nt$rollmean_to_act7ubc21
+    ), na.rm = TRUE)) %>% 
+  mutate(treatment = "1W")
+
+#2W
+NETseq_FRI_2W_AVERAGE_sense_all_nt = NETseq_FRI_2W_rep2_sense_all_nt %>% select(nt_pos, strand) %>% 
+  mutate(counts =  rowMeans(
+    cbind(
+      NETseq_FRI_2W_rep1_sense_all_nt$counts,
+      NETseq_FRI_2W_rep2_sense_all_nt$counts,
+      NETseq_FRI_2W_rep3_sense_all_nt$counts,
+      NETseq_FRI_2W_rep4_sense_all_nt$counts
+    ), na.rm = TRUE)) %>%  
+  mutate(norm_counts =  rowMeans(
+    cbind(
+      NETseq_FRI_2W_rep1_sense_all_nt$norm_counts,
+      NETseq_FRI_2W_rep2_sense_all_nt$norm_counts,
+      NETseq_FRI_2W_rep3_sense_all_nt$norm_counts,
+      NETseq_FRI_2W_rep4_sense_all_nt$norm_counts
+    ), na.rm = TRUE)) %>% 
+  mutate(rollmean_counts =  rowMeans(
+    cbind(
+      NETseq_FRI_2W_rep1_sense_all_nt$rollmean_counts,
+      NETseq_FRI_2W_rep2_sense_all_nt$rollmean_counts,
+      NETseq_FRI_2W_rep3_sense_all_nt$rollmean_counts,
+      NETseq_FRI_2W_rep4_sense_all_nt$rollmean_counts
+    ), na.rm = TRUE)) %>% 
+  mutate(norm_to_act7ubc21 =  rowMeans(
+    cbind(
+      NETseq_FRI_2W_rep1_sense_all_nt$norm_to_act7ubc21,
+      NETseq_FRI_2W_rep2_sense_all_nt$norm_to_act7ubc21,
+      NETseq_FRI_2W_rep3_sense_all_nt$norm_to_act7ubc21,
+      NETseq_FRI_2W_rep4_sense_all_nt$norm_to_act7ubc21
+    ), na.rm = TRUE)) %>% 
+  mutate(rollmean_to_act7ubc21 =  rowMeans(
+    cbind(
+      NETseq_FRI_2W_rep1_sense_all_nt$rollmean_to_act7ubc21,
+      NETseq_FRI_2W_rep2_sense_all_nt$rollmean_to_act7ubc21,
+      NETseq_FRI_2W_rep3_sense_all_nt$rollmean_to_act7ubc21,
+      NETseq_FRI_2W_rep4_sense_all_nt$rollmean_to_act7ubc21
+    ), na.rm = TRUE)) %>% 
+  mutate(treatment = "2W")
+
+#4W
+NETseq_FRI_4W_AVERAGE_sense_all_nt = NETseq_FRI_4W_rep2_sense_all_nt %>% select(nt_pos, strand) %>% 
+  mutate(counts =  rowMeans(
+    cbind(
+      NETseq_FRI_4W_rep1_sense_all_nt$counts,
+      NETseq_FRI_4W_rep2_sense_all_nt$counts,
+      NETseq_FRI_4W_rep3_sense_all_nt$counts,
+      NETseq_FRI_4W_rep4_sense_all_nt$counts
+    ), na.rm = TRUE)) %>%  
+  mutate(norm_counts =  rowMeans(
+    cbind(
+      NETseq_FRI_4W_rep1_sense_all_nt$norm_counts,
+      NETseq_FRI_4W_rep2_sense_all_nt$norm_counts,
+      NETseq_FRI_4W_rep3_sense_all_nt$norm_counts,
+      NETseq_FRI_4W_rep4_sense_all_nt$norm_counts
+    ), na.rm = TRUE)) %>% 
+  mutate(rollmean_counts =  rowMeans(
+    cbind(
+      NETseq_FRI_4W_rep1_sense_all_nt$rollmean_counts,
+      NETseq_FRI_4W_rep2_sense_all_nt$rollmean_counts,
+      NETseq_FRI_4W_rep3_sense_all_nt$rollmean_counts,
+      NETseq_FRI_4W_rep4_sense_all_nt$rollmean_counts
+    ), na.rm = TRUE)) %>% 
+  mutate(norm_to_act7ubc21 =  rowMeans(
+    cbind(
+      NETseq_FRI_4W_rep1_sense_all_nt$norm_to_act7ubc21,
+      NETseq_FRI_4W_rep2_sense_all_nt$norm_to_act7ubc21,
+      NETseq_FRI_4W_rep3_sense_all_nt$norm_to_act7ubc21,
+      NETseq_FRI_4W_rep4_sense_all_nt$norm_to_act7ubc21
+    ), na.rm = TRUE)) %>% 
+  mutate(rollmean_to_act7ubc21 =  rowMeans(
+    cbind(
+      NETseq_FRI_4W_rep1_sense_all_nt$rollmean_to_act7ubc21,
+      NETseq_FRI_4W_rep2_sense_all_nt$rollmean_to_act7ubc21,
+      NETseq_FRI_4W_rep3_sense_all_nt$rollmean_to_act7ubc21,
+      NETseq_FRI_4W_rep4_sense_all_nt$rollmean_to_act7ubc21
+    ), na.rm = TRUE)) %>% 
+  mutate(treatment = "4W")
+
+#4W10
+NETseq_FRI_4W10_AVERAGE_sense_all_nt = NETseq_FRI_4W10_rep2_sense_all_nt %>% select(nt_pos, strand) %>% 
+  mutate(counts =  rowMeans(
+    cbind(
+      NETseq_FRI_4W10_rep1_sense_all_nt$counts,
+      NETseq_FRI_4W10_rep2_sense_all_nt$counts,
+      NETseq_FRI_4W10_rep3_sense_all_nt$counts,
+      NETseq_FRI_4W10_rep4_sense_all_nt$counts
+    ), na.rm = TRUE)) %>%  
+  mutate(norm_counts =  rowMeans(
+    cbind(
+      NETseq_FRI_4W10_rep1_sense_all_nt$norm_counts,
+      NETseq_FRI_4W10_rep2_sense_all_nt$norm_counts,
+      NETseq_FRI_4W10_rep3_sense_all_nt$norm_counts,
+      NETseq_FRI_4W10_rep4_sense_all_nt$norm_counts
+    ), na.rm = TRUE)) %>% 
+  mutate(rollmean_counts =  rowMeans(
+    cbind(
+      NETseq_FRI_4W10_rep1_sense_all_nt$rollmean_counts,
+      NETseq_FRI_4W10_rep2_sense_all_nt$rollmean_counts,
+      NETseq_FRI_4W10_rep3_sense_all_nt$rollmean_counts,
+      NETseq_FRI_4W10_rep4_sense_all_nt$rollmean_counts
+    ), na.rm = TRUE)) %>% 
+  mutate(norm_to_act7ubc21 =  rowMeans(
+    cbind(
+      NETseq_FRI_4W10_rep1_sense_all_nt$norm_to_act7ubc21,
+      NETseq_FRI_4W10_rep2_sense_all_nt$norm_to_act7ubc21,
+      NETseq_FRI_4W10_rep3_sense_all_nt$norm_to_act7ubc21,
+      NETseq_FRI_4W10_rep4_sense_all_nt$norm_to_act7ubc21
+    ), na.rm = TRUE)) %>% 
+  mutate(rollmean_to_act7ubc21 =  rowMeans(
+    cbind(
+      NETseq_FRI_4W10_rep1_sense_all_nt$rollmean_to_act7ubc21,
+      NETseq_FRI_4W10_rep2_sense_all_nt$rollmean_to_act7ubc21,
+      NETseq_FRI_4W10_rep3_sense_all_nt$rollmean_to_act7ubc21,
+      NETseq_FRI_4W10_rep4_sense_all_nt$rollmean_to_act7ubc21
+    ), na.rm = TRUE)) %>% 
+  mutate(treatment = "4W10")
+```
+
+
+```{r Merge all FLC locus average datasets}
+NETseq_ALL_average_sense = bind_rows(NETseq_Col_NV_AVERAGE_sense_all_nt,NETseq_FRI_NV_AVERAGE_sense_all_nt,NETseq_FRI_1W_AVERAGE_sense_all_nt,NETseq_FRI_2W_AVERAGE_sense_all_nt,NETseq_FRI_4W_AVERAGE_sense_all_nt,NETseq_FRI_4W10_AVERAGE_sense_all_nt)
+NETseq_ALL_average_sense$treatment = factor(NETseq_ALL_average_sense$treatment, levels = c("Col-0", "NV", "1W", "2W","4W","4W10"))
+
+```
+
+
+```{r Merge all FLC locus individual reps}
+NETseq_ALL_reps = bind_rows(
+  
+NETseq_Col_NV_rep1_sense_all_nt, NETseq_FRI_NV_rep1_sense_all_nt, NETseq_FRI_1W_rep1_sense_all_nt, NETseq_FRI_2W_rep1_sense_all_nt, NETseq_FRI_4W_rep1_sense_all_nt, NETseq_FRI_4W10_rep1_sense_all_nt,
+
+NETseq_Col_NV_rep2_sense_all_nt, NETseq_FRI_NV_rep2_sense_all_nt, NETseq_FRI_1W_rep2_sense_all_nt, NETseq_FRI_2W_rep2_sense_all_nt, NETseq_FRI_4W_rep2_sense_all_nt, NETseq_FRI_4W10_rep2_sense_all_nt,
+
+NETseq_Col_NV_rep3_sense_all_nt, NETseq_FRI_NV_rep3_sense_all_nt, NETseq_FRI_1W_rep3_sense_all_nt, NETseq_FRI_2W_rep3_sense_all_nt, NETseq_FRI_4W_rep3_sense_all_nt, NETseq_FRI_4W10_rep3_sense_all_nt,
+
+NETseq_Col_NV_rep4_sense_all_nt, NETseq_FRI_NV_rep4_sense_all_nt, NETseq_FRI_1W_rep4_sense_all_nt, NETseq_FRI_2W_rep4_sense_all_nt, NETseq_FRI_4W_rep4_sense_all_nt, NETseq_FRI_4W10_rep4_sense_all_nt
+                                
+                                )
+```
+
+
+
+#Plot total counts
+```{r Function to calculate the mean and the standard deviation for each group}
+library(plyr) 
+#+++++++++++++++++++++++++
+# Function to calculate the mean and the standard deviation
+  # for each group
+#+++++++++++++++++++++++++
+# data : a data frame
+# varname : the name of a column containing the variable
+  #to be summarized
+# groupnames : vector of column names to be used as
+  # grouping variables
+data_summary <- function(data, varname, groupnames){
+  require(plyr)
+  summary_func <- function(x, col){
+    c(mean = mean(x[[col]], na.rm=TRUE),
+      sd = sd(x[[col]], na.rm=TRUE))
+  }
+  data_sum<-ddply(data, groupnames, .fun=summary_func,
+                  varname)
+  data_sum <- rename(data_sum, c("mean" = varname))
+ return(data_sum)
+}
+
+detach("package:plyr", unload = TRUE)
+```
+
+
+```{r Calculate total PolII level mean and sd for each condition, include=FALSE}
+NETseq_ALL_reps$condition = factor(NETseq_ALL_reps$condition, levels = c("Col-0", "NV", "1W", "2W","4W","4W10"))
+NETseq_ALL_reps$biorep = factor(NETseq_ALL_reps$biorep, levels = c("rep1", "rep2", "rep3","rep4"))
+
+
+NETseq_sense_filtered <- NETseq_ALL_reps %>%
+  select(norm_to_act7ubc21, strand, biorep, condition) %>%
+  filter(strand == "sense") %>% select(-strand) %>%
+  group_by(biorep, condition) %>%
+  summarise(sum_norm_counts = sum(norm_to_act7ubc21, na.rm = TRUE))
+
+
+NETseq_sense_summary = data_summary(NETseq_sense_filtered, varname="sum_norm_counts",groupnames=c("condition"))
+NETseq_sense_summary$condition = factor(NETseq_sense_summary$condition, levels = c("Col-0","NV", "1W", "2W","4W","4W10"))
+detach("package:plyr", unload = TRUE)
+```
+
+
+```{r Plot total FLC counts}
+ p <- ggplot(NETseq_sense_summary, aes(condition,sum_norm_counts)) +
+    geom_col(aes(fill = condition), colour = "black", width = 0.6) +   # Bars
+      geom_errorbar(aes(ymin = sum_norm_counts - sd, ymax = sum_norm_counts + sd), 
+                width = 0.2, position = position_dodge(0.9)) +  # Error bars  
+  geom_jitter(data = NETseq_sense_filtered,                            # Replicates
+              aes(x = condition, y = sum_norm_counts),
+              width = 0.1, size = 6, shape = 21, fill = "black", color = "black") +
+scale_y_continuous(expand = expansion(mult = c(0, 0.05))) +
+   scale_x_discrete(
+    labels = parse(text=c(
+  `Col-0` = "bold('Col-0 NV')",
+  NV = "bold('Col')*bolditalic('FRI')*bold(' NV')",
+  `1W` = "bold('Col')*bolditalic('FRI')*bold(' 1W')",
+  `2W` = "bold('Col')*bolditalic('FRI')*bold(' 2W')",
+  `4W` = "bold('Col')*bolditalic('FRI')*bold(' 4W')",
+  `4W10` = "bold('Col')*bolditalic('FRI')*bold(' 4WT10')"
+    )),
+    guide = guide_axis(angle = 45)  
+  ) +
+  scale_fill_manual(values = c("gray50","azure","slategray2","steelblue2","dodgerblue4","gray80")) +
+  theme_bw() +
+    theme(text = element_text(size=40, color = "black"), 
+         axis.text.x = element_text(margin = margin(t = 8), face = "bold",color = "black"),
+          axis.text.y = element_text( face = "bold",color = "black"),
+         axis.title.y = element_text(size = 25, margin = margin(r = 17), face="bold"),
+           axis.line = element_line(color = "black", linewidth = 1.5),
+         axis.ticks = element_line(color = "black", linewidth = 1.5),
+         axis.ticks.length = unit(0.4, "cm"),
+          legend.position = "none",
+        panel.border = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+          plot.margin = margin(t = 50, r = 5, b = 5, l = 5, unit = "pt")
+        ) +
+    ylab("Total counts normalized\n to geometric mean of ACT7 & UBC21") +
+     xlab("") 
+
+  ggsave(paste0("flc_total_pol2_level.png"), p, width=25, height=25, units="cm")
+```
+
+
+
+#Plot termination index
+```{r Calculate PolII level mean and sd for each condition within termination window, include=FALSE}
+#3173473 - 1st major pA site
+
+NETseq_sense_termination_filtered <- NETseq_ALL_reps %>% filter(nt_pos >= (3173473-400) & nt_pos <= (3173473+150)) %>%
+  select(counts, strand, biorep, condition) %>%
+  filter(strand == "sense") %>% select(-strand) %>%
+  group_by(biorep, condition) %>%
+  summarise(sum_counts_term = sum(counts, na.rm = TRUE))
+
+
+NETseq_sense_termination_summary = data_summary(NETseq_sense_termination_filtered, varname="sum_norm_counts_term",groupnames=c("condition"))
+NETseq_sense_termination_summary$condition = factor(NETseq_sense_termination_summary$condition, levels = c("Col-0", "NV", "1W", "2W","4W","4W10"))
+detach("package:plyr", unload = TRUE)
+
+```
+
+```{r Calculate PolII level mean and sd for each condition within gene body, include=FALSE}
+NETseq_sense_body_filtered <- NETseq_ALL_reps %>% filter(nt_pos > (3173473+150) & nt_pos <= (3179448)) %>%
+  select(counts, strand, biorep, condition) %>%
+  filter(strand == "sense") %>% select(-strand) %>%
+  group_by(biorep, condition) %>%
+  summarise(sum_counts_body = sum(counts, na.rm = TRUE)) 
+
+
+NETseq_sense_body_summary = data_summary(NETseq_sense_body_filtered, varname="sum_norm_counts",groupnames=c("condition"))
+NETseq_sense_body_summary$condition = factor(NETseq_sense_body_summary$condition, levels = c("NV", "1W", "2W","4W","4W10"))
+detach("package:plyr", unload = TRUE)
+
+```
+
+
+```{r Calculate termination index, include=FALSE}
+NET_TI_sense = full_join(NETseq_sense_termination_filtered,NETseq_sense_body_filtered, by = c("biorep","condition")) %>% mutate(TI = sum_counts_term/sum_counts_body) %>% select(-sum_counts_term,-sum_counts_body)
+
+NET_TI_sense_summary = data_summary(NET_TI_sense, varname="TI",groupnames=c("condition"))
+NET_TI_sense_summary$condition = factor(NET_TI_sense_summary$condition, levels = c("Col-0","NV", "1W", "2W","4W","4W10"))
+
+detach("package:plyr", unload = TRUE)
+
+```
+
+
+
+```{r Plot termination index}
+ p <- ggplot(NET_TI_sense_summary, aes(condition,TI)) +
+    geom_col(aes(fill = condition), colour = "black", width = 0.6) +   # Bars
+      geom_errorbar(aes(ymin = TI - sd, ymax = TI + sd), 
+                width = 0.2, position = position_dodge(0.9)) +  # Error bars  
+  geom_jitter(data = NET_TI_sense,                            
+              aes(x = condition, y = TI),
+              width = 0.1, size = 6, shape = 21, fill = "black", color = "black") +
+     scale_x_discrete(
+    labels = parse(text=c(
+  `Col-0` = "bold('Col-0 NV')",
+  NV = "bold('Col')*bolditalic('FRI')*bold(' NV')",
+  `1W` = "bold('Col')*bolditalic('FRI')*bold(' 1W')",
+  `2W` = "bold('Col')*bolditalic('FRI')*bold(' 2W')",
+  `4W` = "bold('Col')*bolditalic('FRI')*bold(' 4W')",
+  `4W10` = "bold('Col')*bolditalic('FRI')*bold(' 4WT10')"
+    )),
+    guide = guide_axis(angle = 45) 
+  ) +
+scale_y_continuous(limits = c(0,0.8),expand = expansion(mult = c(0, 0.05))) +
+  scale_fill_manual(values = c("gray50","azure","slategray2","steelblue2","dodgerblue4","gray80")) +
+  theme_bw() +
+    theme(text = element_text(size=40, color = "black"), 
+         axis.text.x = element_text(margin = margin(t = 8), face = "bold",color = "black"),
+          axis.text.y = element_text(face = "bold",color = "black"),
+         axis.title.y = element_text(size = 25, margin = margin(r = 17), face="bold"),
+           axis.line = element_line(color = "black", linewidth = 1.5),
+         axis.ticks = element_line(color = "black", linewidth = 1.5),
+         axis.ticks.length = unit(0.4, "cm"),
+          legend.position = "none",
+        panel.border = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+          plot.margin = margin(t = 25, r = 5, b = 5, l = 5, unit = "pt")
+
+        )+
+    ylab("Termination index\n(Termination window: Gene body)") +
+     xlab("") 
+
+  ggsave(paste0("termination_index.png"), p, width=25, height=25, units="cm")
+  
+```
+
+
+
+#Plot PolII distribution
+```{r flc annotation to add to plot}
+
+flc_annotation = list(
+  geom_vline(xintercept = c(3173529,3173473), color = "black", linetype = "dotted", linewidth = 0.45),  #major flc pA sites
+  geom_vline(xintercept = c(3173382, 3179448), color = "black",linetype = "dashed", linewidth = 0.45) #flc tss,tes
+)
+
+```
+
+
+```{r Plot FLC gene model}
+FLC_gene <- ggplot(FLC_positions_NETseq, aes(x=nt_pos)) +
+  scale_x_continuous(position = "top",
+    limits = c(3173000 , 3180000),  
+    breaks = seq(3173000, 3180000, by = 1000)  
+  ) +
+scale_y_continuous(limits = c(-0.5, 0.5), expand = c(0, 0))+
+  theme_bw()+
+  theme(
+    axis.title.x=element_blank(), 
+     axis.text.x=element_blank(),
+     axis.ticks.x=element_blank(), 
+    axis.text.y=element_blank(), 
+    axis.line.y=element_blank(), 
+    axis.ticks.y=element_blank(), 
+    axis.title.y=element_blank(), 
+    panel.grid.minor = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.border = element_blank(),      
+   plot.margin= grid::unit(c(0, 0, 0, 0), "in"),
+    legend.position="none") + 
+annotate("segment", x=3173382, xend=3179448, y=0, yend=0, color="gray40", linewidth=1) + 
+  annotate("segment", x=3179155, xend=3179455, y=0, yend=0, color="black", linewidth=8) + 
+  annotate("segment", x=3175604, xend=3175661, y=0, yend=0, color="black", linewidth=14) +
+  annotate("segment", x=3175364, xend=3175425, y=0, yend=0, color="black", linewidth=14) + 
+  annotate("segment", x=3175174, xend=3175273, y=0, yend=0, color="black", linewidth=14) + 
+  annotate("segment", x=3175054, xend=3175095, y=0, yend=0, color="black", linewidth=14) +
+  annotate("segment", x=3174818, xend=3174859, y=0, yend=0, color="black", linewidth=14) + 
+  annotate("segment", x=3173375, xend=3173825, y=0, yend=0, color="black", linewidth=8) +
+  annotate("segment", x=3179155, xend=3179340, y=0, yend=0, color="black", linewidth=14) + #after 5'utr
+  annotate("segment", x=3173723, xend=3173825, y=0, yend=0, color="black", linewidth=14)   #before 3'utr 
+
+
+```
+
+
+```{r Create plots Pol2 distributions of NV vs Col/cold normalized to ACT7 & UBC21}
+
+
+#DATA NV vs Col-0
+NETseq_sense_shading_FRI_NV = NETseq_ALL_average_sense %>% filter(treatment %in% c("NV")) %>% mutate(rollmean_to_act7ubc21_fri_nv = rollmean_to_act7ubc21)
+NETseq_sense_shading_Col_NV = NETseq_ALL_average_sense %>% filter(treatment %in% c("Col-0"))  %>% mutate(rollmean_to_act7ubc21_col = rollmean_to_act7ubc21)
+
+NETseq_sense_shading_FRI_Col_NV = merge(NETseq_sense_shading_FRI_NV, NETseq_sense_shading_Col_NV, by="nt_pos") %>% drop_na() %>%  
+  mutate(
+    ymin = pmin(rollmean_to_act7ubc21_fri_nv, rollmean_to_act7ubc21_col),
+    ymax = pmax(rollmean_to_act7ubc21_fri_nv, rollmean_to_act7ubc21_col),
+    higher = case_when(
+      rollmean_to_act7ubc21_fri_nv > rollmean_to_act7ubc21_col ~ "NV",
+      rollmean_to_act7ubc21_col > rollmean_to_act7ubc21_fri_nv ~ "Col-0",
+      TRUE ~ "equal"
+    ),
+    group_id = data.table::rleid(higher)  # unique group for each stretch of same "higher"
+  )
+
+#PLOT NV vs Col-0
+plot_col <- ggplot(data = get(paste0("NETseq_sense_shading_FRI_Col_NV")), aes(x=nt_pos)) +
+  geom_line(aes(y = rollmean_to_act7ubc21_fri_nv), colour = "red", 
+            linewidth = 0.2) +
+  geom_line(aes(y = rollmean_to_act7ubc21_col), colour = "blue", 
+            linewidth = 0.35) +
+  geom_ribbon(aes(ymin = ymin, ymax = ymax, 
+                  fill = higher, group = group_id)) +
+  scale_fill_manual(values = c("NV" = "red", "Col-0" = "blue", "equal" = "black"),
+                    breaks = c("NV", "Col-0"),
+                    labels = c("NV" = "NV ", "Col-0" = "Col-0   ")) +
+  scale_x_continuous(
+    limits = c(3173000 , 3180000),  
+    breaks = seq(3173000, 3180000, by = 1000),  
+      labels = function(x) format(x / 1e6, digits = 4, nsmall = 3) #reformat to Mb (3.173, etc)
+  ) +
+  flc_annotation +
+  scale_y_continuous(
+    limits = c(0 , 0.006),  
+    breaks = seq(0, 0.006, by = 0.002)  
+    ) +
+  theme_bw() +
+  theme(text = element_text(size=10), 
+        axis.title.y = element_blank(),
+        axis.title.x = element_blank(),
+        panel.border = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.line = element_line(color = "black"),
+        plot.title = element_text(
+          hjust = 0.5,      
+          vjust = -8        
+        ),
+        legend.title = element_blank(),
+        legend.text = element_text(size = 10)) +
+  ggtitle("ColFRI NV vs Col-0 NV") 
+
+#DATA NV vs 1W
+NETseq_sense_shading_FRI_NV = NETseq_ALL_average_sense %>% filter(treatment %in% c("NV")) %>% mutate(rollmean_to_act7ubc21_fri_nv = rollmean_to_act7ubc21)
+NETseq_sense_shading_FRI_1W = NETseq_ALL_average_sense %>% filter(treatment %in% c("1W"))  %>% mutate(rollmean_to_act7ubc21_1w = rollmean_to_act7ubc21)
+
+NETseq_sense_shading_FRI_NV_1W = merge(NETseq_sense_shading_FRI_NV, NETseq_sense_shading_FRI_1W, by="nt_pos") %>% drop_na() %>%  
+  mutate(
+    ymin = pmin(rollmean_to_act7ubc21_fri_nv, rollmean_to_act7ubc21_1w),
+    ymax = pmax(rollmean_to_act7ubc21_fri_nv, rollmean_to_act7ubc21_1w),
+    higher = case_when(
+      rollmean_to_act7ubc21_fri_nv > rollmean_to_act7ubc21_1w ~ "NV",
+      rollmean_to_act7ubc21_1w > rollmean_to_act7ubc21_fri_nv ~ "1W",
+      TRUE ~ "equal"
+    ),
+    group_id = data.table::rleid(higher)  # unique group for each stretch of same "higher"
+  )
+
+#PLOT NV vs 1W
+plot_1w <- ggplot(data = get(paste0("NETseq_sense_shading_FRI_NV_1W")), aes(x=nt_pos)) +
+  geom_line(aes(y = rollmean_to_act7ubc21_fri_nv), colour = "red", 
+            linewidth = 0.2) +
+  geom_line(aes(y = rollmean_to_act7ubc21_1w), colour = "blue", 
+            linewidth = 0.35) +
+  geom_ribbon(aes(ymin = ymin, ymax = ymax, 
+                  fill = higher, group = group_id)) +
+  scale_fill_manual(values = c("NV" = "red", "1W" = "blue", "equal" = "black"),
+                    breaks = c("NV", "1W"),
+                    labels = c("NV" = "NV ", "1W" = "1W      ")) +
+  scale_x_continuous(
+    limits = c(3173000 , 3180000),  
+    breaks = seq(3173000, 3180000, by = 1000),  
+  labels = function(x) format(x / 1e6, digits = 4, nsmall = 3) #reformat to Mb (3.173, etc)
+  ) +
+  flc_annotation +
+  scale_y_continuous(
+    limits = c(0 , 0.006),  
+    breaks = seq(0, 0.006, by = 0.002)  
+  ) +
+  theme_bw() +
+  theme(text = element_text(size=10), 
+        axis.title.y = element_blank(),
+        axis.title.x = element_blank(),
+        panel.border = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.line = element_line(color = "black"),
+        plot.title = element_text(
+          hjust = 0.5,      
+          vjust = -8        
+        ),
+        legend.title = element_blank(),
+        legend.text = element_text(size = 10)) +
+  ggtitle("ColFRI NV vs ColFRI 1W")
+
+
+
+
+#DATA NV vs 2W
+NETseq_sense_shading_FRI_NV = NETseq_ALL_average_sense %>% filter(treatment %in% c("NV")) %>% mutate(rollmean_to_act7ubc21_fri_nv = rollmean_to_act7ubc21)
+NETseq_sense_shading_FRI_2W = NETseq_ALL_average_sense %>% filter(treatment %in% c("2W"))  %>% mutate(rollmean_to_act7ubc21_2W = rollmean_to_act7ubc21)
+
+NETseq_sense_shading_FRI_NV_2W = merge(NETseq_sense_shading_FRI_NV, NETseq_sense_shading_FRI_2W, by="nt_pos") %>% drop_na() %>%  
+  mutate(
+    ymin = pmin(rollmean_to_act7ubc21_fri_nv, rollmean_to_act7ubc21_2W),
+    ymax = pmax(rollmean_to_act7ubc21_fri_nv, rollmean_to_act7ubc21_2W),
+    higher = case_when(
+      rollmean_to_act7ubc21_fri_nv > rollmean_to_act7ubc21_2W ~ "NV",
+      rollmean_to_act7ubc21_2W > rollmean_to_act7ubc21_fri_nv ~ "2W",
+      TRUE ~ "equal"
+    ),
+    group_id = data.table::rleid(higher)  # unique group for each stretch of same "higher"
+  )
+
+#PLOT NV vs 2W
+plot_2w <- ggplot(data = get(paste0("NETseq_sense_shading_FRI_NV_2W")), aes(x=nt_pos)) +
+  geom_line(aes(y = rollmean_to_act7ubc21_fri_nv), colour = "red", 
+            linewidth = 0.2) +
+  geom_line(aes(y = rollmean_to_act7ubc21_2W), colour = "blue", 
+            linewidth = 0.35) +
+  geom_ribbon(aes(ymin = ymin, ymax = ymax, 
+                  fill = higher, group = group_id)) +
+  scale_fill_manual(values = c("NV" = "red", "2W" = "blue", "equal" = "black"),
+                    breaks = c("NV", "2W"),
+                    labels = c("NV" = "NV ", "2W" = "2W      "))  +
+  scale_x_continuous(
+    limits = c(3173000 , 3180000),  
+    breaks = seq(3173000, 3180000, by = 1000),  
+  labels = function(x) format(x / 1e6, digits = 4, nsmall = 3) #reformat to Mb (3.173, etc)
+  ) +
+  flc_annotation +
+  scale_y_continuous(
+    limits = c(0 , 0.006),  
+    breaks = seq(0, 0.006, by = 0.002)  
+  ) +
+  theme_bw() +
+  theme(text = element_text(size=10), 
+        axis.title.y = element_blank(),
+        axis.title.x = element_blank(),
+        panel.border = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.line = element_line(color = "black"),
+        plot.title = element_text(
+          hjust = 0.5,      
+          vjust = -8        
+        ),
+        legend.title = element_blank(),
+        legend.text = element_text(size = 10)) +
+  ggtitle("ColFRI NV vs ColFRI 2W")
+
+
+
+#DATA NV vs 4W
+NETseq_sense_shading_FRI_NV = NETseq_ALL_average_sense %>% filter(treatment %in% c("NV")) %>% mutate(rollmean_to_act7ubc21_fri_nv = rollmean_to_act7ubc21)
+NETseq_sense_shading_FRI_4W = NETseq_ALL_average_sense %>% filter(treatment %in% c("4W"))  %>% mutate(rollmean_to_act7ubc21_4W = rollmean_to_act7ubc21)
+
+NETseq_sense_shading_FRI_NV_4W = merge(NETseq_sense_shading_FRI_NV, NETseq_sense_shading_FRI_4W, by="nt_pos") %>% drop_na() %>%  
+  mutate(
+    ymin = pmin(rollmean_to_act7ubc21_fri_nv, rollmean_to_act7ubc21_4W),
+    ymax = pmax(rollmean_to_act7ubc21_fri_nv, rollmean_to_act7ubc21_4W),
+    higher = case_when(
+      rollmean_to_act7ubc21_fri_nv > rollmean_to_act7ubc21_4W ~ "NV",
+      rollmean_to_act7ubc21_4W > rollmean_to_act7ubc21_fri_nv ~ "4W",
+      TRUE ~ "equal"
+    ),
+    group_id = data.table::rleid(higher)  # unique group for each stretch of same "higher"
+  )
+
+#PLOT NV vs 4W
+plot_4w <- ggplot(data = get(paste0("NETseq_sense_shading_FRI_NV_4W")), aes(x=nt_pos)) +
+  geom_line(aes(y = rollmean_to_act7ubc21_fri_nv), colour = "red", 
+            linewidth = 0.2) +
+  geom_line(aes(y = rollmean_to_act7ubc21_4W), colour = "blue", 
+            linewidth = 0.35) +
+  geom_ribbon(aes(ymin = ymin, ymax = ymax, 
+                  fill = higher, group = group_id)) +
+  scale_fill_manual(values = c("NV" = "red", "4W" = "blue", "equal" = "black"),
+                    breaks = c("NV", "4W"),
+                    labels = c("NV" = "NV ", "4W" = "4W      ")) +
+  scale_x_continuous(
+    limits = c(3173000 , 3180000),  
+    breaks = seq(3173000, 3180000, by = 1000),  
+      labels = function(x) format(x / 1e6, digits = 4, nsmall = 3) #reformat to Mb (3.173, etc)
+  ) +
+  flc_annotation +
+  scale_y_continuous(
+    limits = c(0 , 0.006),  
+    breaks = seq(0, 0.006, by = 0.002)  
+  ) +
+  theme_bw() +
+  theme(text = element_text(size=10), 
+        axis.title.y = element_blank(),
+        axis.title.x = element_blank(),
+        panel.border = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.line = element_line(color = "black"),
+        plot.title = element_text(
+          hjust = 0.5,      
+          vjust = -8        
+        ),
+        legend.title = element_blank(),
+        legend.text = element_text(size = 10)) +
+  ggtitle("ColFRI NV vs ColFRI 4W")
+
+
+
+#DATA NV vs 4W10
+NETseq_sense_shading_FRI_NV = NETseq_ALL_average_sense %>% filter(treatment %in% c("NV")) %>% mutate(rollmean_to_act7ubc21_fri_nv = rollmean_to_act7ubc21)
+NETseq_sense_shading_FRI_4W10 = NETseq_ALL_average_sense %>% filter(treatment %in% c("4W10"))  %>% mutate(rollmean_to_act7ubc21_4W10 = rollmean_to_act7ubc21)
+
+NETseq_sense_shading_FRI_NV_4W10 = merge(NETseq_sense_shading_FRI_NV, NETseq_sense_shading_FRI_4W10, by="nt_pos") %>% drop_na() %>%  
+  mutate(
+    ymin = pmin(rollmean_to_act7ubc21_fri_nv, rollmean_to_act7ubc21_4W10),
+    ymax = pmax(rollmean_to_act7ubc21_fri_nv, rollmean_to_act7ubc21_4W10),
+    higher = case_when(
+      rollmean_to_act7ubc21_fri_nv > rollmean_to_act7ubc21_4W10 ~ "NV",
+      rollmean_to_act7ubc21_4W10 > rollmean_to_act7ubc21_fri_nv ~ "4W10",
+      TRUE ~ "equal"
+    ),
+    group_id = data.table::rleid(higher)  # unique group for each stretch of same "higher"
+  )
+
+#PLOT NV vs 4W10
+plot_4w10 <- ggplot(data = get(paste0("NETseq_sense_shading_FRI_NV_4W10")), aes(x=nt_pos)) +
+  geom_line(aes(y = rollmean_to_act7ubc21_fri_nv), colour = "red", 
+            linewidth = 0.2) +
+  geom_line(aes(y = rollmean_to_act7ubc21_4W10), colour = "blue", 
+            linewidth = 0.35) +
+  geom_ribbon(aes(ymin = ymin, ymax = ymax, 
+                  fill = higher, group = group_id)) +
+  scale_fill_manual(values = c("NV" = "red", "4W10" = "blue", "equal" = "black"),
+                    breaks = c("NV", "4W10"),
+                    labels = c("NV" = "NV", "4W10" = "4WT10")) +
+  scale_x_continuous(
+    limits = c(3173000 , 3180000),  
+    breaks = seq(3173000, 3180000, by = 1000),  
+  labels = function(x) format(x / 1e6, digits = 4, nsmall = 3) #reformat to Mb (3.173, etc)
+  ) +
+  flc_annotation +
+  scale_y_continuous(
+    limits = c(0 , 0.006), 
+    breaks = seq(0, 0.006, by = 0.002) 
+  ) +
+  theme_bw() +
+  theme(text = element_text(size=10), 
+        axis.title.y = element_blank(),
+        axis.title.x = element_text(margin = margin(t = 10)),
+        panel.border = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.line = element_line(color = "black"),
+        plot.title = element_text(
+          hjust = 0.5,      
+          vjust = -8        
+        ),
+        legend.title = element_blank(),
+        legend.text = element_text(size = 10)) +
+  ggtitle("ColFRI NV vs ColFRI 4WT10") +
+  xlab("Genomic coordinates (Mb)") 
+
+```
+
+```{r Create final figure PolII distribution norm to ACT7 & UBC21}
+
+combined_plot <- FLC_gene/ plot_col / plot_spacer()/ plot_1w / plot_spacer()/ plot_2w / plot_spacer()/ plot_4w / plot_spacer()/ plot_4w10 + plot_layout(heights = c(0.1, 0.18, -0.14, 0.18, -0.14, 0.18, -0.14, 0.18, -0.14, 0.18)) 
+
+
+p = wrap_elements(combined_plot) +
+  labs(tag = "Counts normalized to geometric mean of ACT7 & UBC21") +
+  theme(
+    plot.tag = element_text(size = rel(1), angle = 90),
+    plot.tag.position = "left"
+  )
+
+
+ggsave("flc_pol2_profile_to_act7ubc21.png", p, width = 20, height = 14, units = "cm", dpi = 400)
+
+```
+
+```{r Create plots Pol2 distributions of NV vs Col/cold normalized to the total across locus}
+
+
+#DATA NV vs Col-0
+NETseq_sense_shading_FRI_NV = NETseq_ALL_average_sense %>% filter(treatment %in% c("NV")) %>% mutate(rollmean_counts_fri_nv = rollmean_counts)
+NETseq_sense_shading_Col_NV = NETseq_ALL_average_sense %>% filter(treatment %in% c("Col-0"))  %>% mutate(rollmean_counts_col = rollmean_counts)
+
+NETseq_sense_shading_FRI_Col_NV = merge(NETseq_sense_shading_FRI_NV, NETseq_sense_shading_Col_NV, by="nt_pos") %>% drop_na() %>%  
+  mutate(
+    ymin = pmin(rollmean_counts_fri_nv, rollmean_counts_col),
+    ymax = pmax(rollmean_counts_fri_nv, rollmean_counts_col),
+    higher = case_when(
+      rollmean_counts_fri_nv > rollmean_counts_col ~ "NV",
+      rollmean_counts_col > rollmean_counts_fri_nv ~ "Col-0",
+      TRUE ~ "equal"
+    ),
+    group_id = data.table::rleid(higher)  # unique group for each stretch of same "higher"
+  )
+
+#PLOT NV vs Col-0
+plot_col <- ggplot(data = get(paste0("NETseq_sense_shading_FRI_Col_NV")), aes(x=nt_pos)) +
+  geom_line(aes(y = rollmean_counts_fri_nv), colour = "red", 
+            linewidth = 0.2) +
+  geom_line(aes(y = rollmean_counts_col), colour = "blue", 
+            linewidth = 0.2) +
+  geom_ribbon(aes(ymin = ymin, ymax = ymax, 
+                  fill = higher, group = group_id)) +
+  scale_fill_manual(values = c("NV" = "red", "Col-0" = "blue", "equal" = "black"),
+                    breaks = c("NV", "Col-0"),
+                    labels = c("NV" = "NV ", "Col-0" = "Col-0   ")) +
+  scale_x_continuous(
+    limits = c(3173000 , 3180000),  
+    breaks = seq(3173000, 3180000, by = 1000),  
+      labels = function(x) format(x / 1e6, digits = 4, nsmall = 3) #reformat to Mb (3.173, etc)
+  ) +
+  flc_annotation +
+  scale_y_continuous(
+    limits = c(0 , 0.006),  
+    breaks = seq(0, 0.006, by = 0.002)  
+  ) +
+  theme_bw() +
+  theme(text = element_text(size=10), 
+        axis.title.y = element_blank(),
+        axis.title.x = element_blank(),
+        panel.border = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.line = element_line(color = "black"),
+        plot.title = element_text(
+          hjust = 0.5,     
+          vjust = -8       
+        ),
+        legend.title = element_blank(),
+        legend.text = element_text(size = 10)) +
+  ggtitle("ColFRI NV vs Col-0 NV") 
+
+
+
+
+#DATA NV vs 1W
+NETseq_sense_shading_FRI_NV = NETseq_ALL_average_sense %>% filter(treatment %in% c("NV")) %>% mutate(rollmean_counts_fri_nv = rollmean_counts)
+NETseq_sense_shading_FRI_1W = NETseq_ALL_average_sense %>% filter(treatment %in% c("1W"))  %>% mutate(rollmean_counts_1w = rollmean_counts)
+
+NETseq_sense_shading_FRI_NV_1W = merge(NETseq_sense_shading_FRI_NV, NETseq_sense_shading_FRI_1W, by="nt_pos") %>% drop_na() %>%  
+  mutate(
+    ymin = pmin(rollmean_counts_fri_nv, rollmean_counts_1w),
+    ymax = pmax(rollmean_counts_fri_nv, rollmean_counts_1w),
+    higher = case_when(
+      rollmean_counts_fri_nv > rollmean_counts_1w ~ "NV",
+      rollmean_counts_1w > rollmean_counts_fri_nv ~ "1W",
+      TRUE ~ "equal"
+    ),
+    group_id = data.table::rleid(higher)  # unique group for each stretch of same "higher"
+  )
+
+#PLOT NV vs 1W
+plot_1w <- ggplot(data = get(paste0("NETseq_sense_shading_FRI_NV_1W")), aes(x=nt_pos)) +
+  
+  geom_line(aes(y = rollmean_counts_fri_nv), colour = "red", 
+            linewidth = 0.2) +
+  geom_line(aes(y = rollmean_counts_1w), colour = "blue", 
+            linewidth = 0.2) +
+  geom_ribbon(aes(ymin = ymin, ymax = ymax, 
+                  fill = higher, group = group_id)) +
+  scale_fill_manual(values = c("NV" = "red", "1W" = "blue", "equal" = "black"),
+                    breaks = c("NV", "1W"),
+                    labels = c("NV" = "NV ", "1W" = "1W      ")) +
+  scale_x_continuous(
+    limits = c(3173000 , 3180000),  
+    breaks = seq(3173000, 3180000, by = 1000),  
+      labels = function(x) format(x / 1e6, digits = 4, nsmall = 3) #reformat to Mb (3.173, etc)
+  ) +
+  flc_annotation +
+  scale_y_continuous(
+    limits = c(0 , 0.006),  
+    breaks = seq(0, 0.006, by = 0.002)  
+  ) +
+  theme_bw() +
+  theme(text = element_text(size=10), 
+        axis.title.y = element_blank(),
+        axis.title.x = element_blank(),
+        panel.border = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.line = element_line(color = "black"),
+        plot.title = element_text(
+          hjust = 0.5,     
+          vjust = -8       
+        ),
+        legend.title = element_blank(),
+        legend.text = element_text(size = 10)) +
+  ggtitle("ColFRI NV vs ColFRI 1W")
+
+
+
+#DATA NV vs 2W
+NETseq_sense_shading_FRI_NV = NETseq_ALL_average_sense %>% filter(treatment %in% c("NV")) %>% mutate(rollmean_counts_fri_nv = rollmean_counts)
+NETseq_sense_shading_FRI_2W = NETseq_ALL_average_sense %>% filter(treatment %in% c("2W"))  %>% mutate(rollmean_counts_2W = rollmean_counts)
+
+NETseq_sense_shading_FRI_NV_2W = merge(NETseq_sense_shading_FRI_NV, NETseq_sense_shading_FRI_2W, by="nt_pos") %>% drop_na() %>%  
+  mutate(
+    ymin = pmin(rollmean_counts_fri_nv, rollmean_counts_2W),
+    ymax = pmax(rollmean_counts_fri_nv, rollmean_counts_2W),
+    higher = case_when(
+      rollmean_counts_fri_nv > rollmean_counts_2W ~ "NV",
+      rollmean_counts_2W > rollmean_counts_fri_nv ~ "2W",
+      TRUE ~ "equal"
+    ),
+    group_id = data.table::rleid(higher)  # unique group for each stretch of same "higher"
+  )
+
+#PLOT NV vs 2W
+plot_2w <- ggplot(data = get(paste0("NETseq_sense_shading_FRI_NV_2W")), aes(x=nt_pos)) +
+  
+  geom_line(aes(y = rollmean_counts_fri_nv), colour = "red", 
+            linewidth = 0.2) +
+  geom_line(aes(y = rollmean_counts_2W), colour = "blue", 
+            linewidth = 0.2) +
+  geom_ribbon(aes(ymin = ymin, ymax = ymax, 
+                  fill = higher, group = group_id)) +
+  scale_fill_manual(values = c("NV" = "red", "2W" = "blue", "equal" = "black"),
+                    breaks = c("NV", "2W"),
+                    labels = c("NV" = "NV ", "2W" = "2W      "))  +
+  scale_x_continuous(
+    limits = c(3173000 , 3180000),  
+    breaks = seq(3173000, 3180000, by = 1000),  
+      labels = function(x) format(x / 1e6, digits = 4, nsmall = 3) #reformat to Mb (3.173, etc)
+  ) +
+  flc_annotation +
+  scale_y_continuous(
+    limits = c(0 , 0.006),  
+    breaks = seq(0, 0.006, by = 0.002)  
+  ) +
+  theme_bw() +
+  theme(text = element_text(size=10), 
+        axis.title.y = element_blank(),
+        axis.title.x = element_blank(),
+        panel.border = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.line = element_line(color = "black"),
+        plot.title = element_text(
+          hjust = 0.5,     
+          vjust = -8       
+        ),
+        legend.title = element_blank(),
+        legend.text = element_text(size = 10)) +
+  ggtitle("ColFRI NV vs ColFRI 2W")
+
+
+#DATA NV vs 4W
+NETseq_sense_shading_FRI_NV = NETseq_ALL_average_sense %>% filter(treatment %in% c("NV")) %>% mutate(rollmean_counts_fri_nv = rollmean_counts)
+NETseq_sense_shading_FRI_4W = NETseq_ALL_average_sense %>% filter(treatment %in% c("4W"))  %>% mutate(rollmean_counts_4W = rollmean_counts)
+
+NETseq_sense_shading_FRI_NV_4W = merge(NETseq_sense_shading_FRI_NV, NETseq_sense_shading_FRI_4W, by="nt_pos") %>% drop_na() %>%  
+  mutate(
+    ymin = pmin(rollmean_counts_fri_nv, rollmean_counts_4W),
+    ymax = pmax(rollmean_counts_fri_nv, rollmean_counts_4W),
+    higher = case_when(
+      rollmean_counts_fri_nv > rollmean_counts_4W ~ "NV",
+      rollmean_counts_4W > rollmean_counts_fri_nv ~ "4W",
+      TRUE ~ "equal"
+    ),
+    group_id = data.table::rleid(higher)  # unique group for each stretch of same "higher"
+  )
+
+#PLOT NV vs 4W
+plot_4w <- ggplot(data = get(paste0("NETseq_sense_shading_FRI_NV_4W")), aes(x=nt_pos)) +
+  
+  geom_line(aes(y = rollmean_counts_fri_nv), colour = "red", 
+            linewidth = 0.2) +
+  geom_line(aes(y = rollmean_counts_4W), colour = "blue", 
+            linewidth = 0.2) +
+  geom_ribbon(aes(ymin = ymin, ymax = ymax, 
+                  fill = higher, group = group_id)) +
+  scale_fill_manual(values = c("NV" = "red", "4W" = "blue", "equal" = "black"),
+                    breaks = c("NV", "4W"),
+                    labels = c("NV" = "NV ", "4W" = "4W      ")) +
+  scale_x_continuous(
+    limits = c(3173000 , 3180000),  
+    breaks = seq(3173000, 3180000, by = 1000),  
+      labels = function(x) format(x / 1e6, digits = 4, nsmall = 3) #reformat to Mb (3.173, etc)
+  ) +
+  flc_annotation +
+  scale_y_continuous(
+    limits = c(0 , 0.006),  
+    breaks = seq(0, 0.006, by = 0.002)  
+  ) +
+  theme_bw() +
+  theme(text = element_text(size=10), 
+        axis.title.y = element_blank(),
+        axis.title.x = element_blank(),
+        panel.border = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.line = element_line(color = "black"),
+        plot.title = element_text(
+          hjust = 0.5,     
+          vjust = -8       
+        ),
+        legend.title = element_blank(),
+        legend.text = element_text(size = 10)) +
+  ggtitle("ColFRI NV vs ColFRI 4W")
+
+
+#DATA NV vs 4W10
+NETseq_sense_shading_FRI_NV = NETseq_ALL_average_sense %>% filter(treatment %in% c("NV")) %>% mutate(rollmean_counts_fri_nv = rollmean_counts)
+NETseq_sense_shading_FRI_4W10 = NETseq_ALL_average_sense %>% filter(treatment %in% c("4W10"))  %>% mutate(rollmean_counts_4W10 = rollmean_counts)
+
+NETseq_sense_shading_FRI_NV_4W10 = merge(NETseq_sense_shading_FRI_NV, NETseq_sense_shading_FRI_4W10, by="nt_pos") %>% drop_na() %>%  
+  mutate(
+    ymin = pmin(rollmean_counts_fri_nv, rollmean_counts_4W10),
+    ymax = pmax(rollmean_counts_fri_nv, rollmean_counts_4W10),
+    higher = case_when(
+      rollmean_counts_fri_nv > rollmean_counts_4W10 ~ "NV",
+      rollmean_counts_4W10 > rollmean_counts_fri_nv ~ "4W10",
+      TRUE ~ "equal"
+    ),
+    group_id = data.table::rleid(higher)  # unique group for each stretch of same "higher"
+  )
+
+#PLOT NV vs 4W10
+plot_4w10 <- ggplot(data = get(paste0("NETseq_sense_shading_FRI_NV_4W10")), aes(x=nt_pos)) +
+  
+  geom_line(aes(y = rollmean_counts_fri_nv), colour = "red", 
+            linewidth = 0.2) +
+  geom_line(aes(y = rollmean_counts_4W10), colour = "blue", 
+            linewidth = 0.2) +
+  geom_ribbon(aes(ymin = ymin, ymax = ymax, 
+                  fill = higher, group = group_id)) +
+  scale_fill_manual(values = c("NV" = "red", "4W10" = "blue", "equal" = "black"),
+                    breaks = c("NV", "4W10"),
+                    labels = c("NV" = "NV", "4W10" = "4WT10")) +
+  scale_x_continuous(
+    limits = c(3173000 , 3180000),  
+    breaks = seq(3173000, 3180000, by = 1000),  
+  labels = function(x) format(x / 1e6, digits = 4, nsmall = 3) #reformat to Mb (3.173, etc)
+  ) +
+  flc_annotation +
+  scale_y_continuous(
+    limits = c(0 , 0.006),  
+    breaks = seq(0, 0.006, by = 0.002)  
+  ) +
+  theme_bw() +
+  theme(text = element_text(size=10), 
+        axis.title.y = element_blank(),
+        axis.title.x = element_text(margin = margin(t = 10)),
+        panel.border = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.line = element_line(color = "black"),
+        plot.title = element_text(
+          hjust = 0.5,     
+          vjust = -8       
+        ),
+        legend.title = element_blank(),
+        legend.text = element_text(size = 10)) +
+  ggtitle("ColFRI NV vs ColFRI 4WT10") +
+  xlab("Genomic coordinates (Mb)") 
+
+
+
+```
+
+
+```{r Create final figure Pol2 distributions of NV vs Col/cold normalized to the total across locus}
+combined_plot <- FLC_gene/ plot_col / plot_spacer()/ plot_1w / plot_spacer()/ plot_2w / plot_spacer()/ plot_4w / plot_spacer()/ plot_4w10 + plot_layout(heights = c(0.1, 0.18, -0.14, 0.18, -0.14, 0.18, -0.14, 0.18, -0.14, 0.18)) 
+
+
+p = wrap_elements(combined_plot) +
+  labs(tag = "Counts normalized to total across locus") +
+  theme(
+    plot.tag = element_text(size = rel(1), angle = 90),
+    plot.tag.position = "left"
+  )
+
+
+ggsave("flc_pol2_profile_to_locus_total.png", p, width = 20, height = 14, units = "cm", dpi = 400)
+```
+
