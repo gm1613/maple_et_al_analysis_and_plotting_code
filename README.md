@@ -9,7 +9,7 @@ Figures 1, S2, S12: spliced_unspliced_analysis.ipynb
 
 Figure 2: FLC_mRNA_decay_rates.ipynb  (Note: FLC_mRNA_ActD_Decay_Exp2_Dataset.xlsx.zip must be unzipped to be used by FLC_mRNA_decay_rates.ipynb)
 
-Figure 3: maple_et_al_plaNETseq_script.Rmd
+Figure 3, S5: maple_et_al_plaNETseq_script.Rmd (Note: The necessary .bed files must be prepared first)
 
-Figure 5, S3, S4, S5, S6, S9: flc_intron1_model_parameter_inference.ipynb  
+Figure 4, S6-S11: flc_intron1_model_parameter_inference.ipynb  
 
