@@ -1,5 +1,5 @@
 # FLC_intron1_model_fitting
-Python and R code and associated data files used to perform data analysis, model parameter inference, and creating plots for figures in Maple et al., 2025. Primer tables are also included.
+Python and R code and associated data files used to perform data analysis, model parameter inference, and creating plots for figures in Maple et al., 2025. Primer tables and FLC sm-FISH probe details are also included.
 
 FLC_mRNA_ActD_Decay_Exp2_Dataset.xlsx.zip contains an Excel file that includes the mRNA counts per unit area for FLC, obtained from analysis of the smFISH images as described in the Methods section of the paper.
 
