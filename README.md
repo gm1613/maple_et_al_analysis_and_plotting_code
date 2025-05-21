@@ -1,15 +1,15 @@
 # FLC_intron1_model_fitting
-Python code and associated data files used to perform parameter inference for the intronic RNA model and other data analysis in Maple et al., 2025. Primer tables also included.
+Python and R code and associated data files used to perform data analysis, model parameter inference, and creating plots for figures in Maple et al., 2025. Primer tables are also included.
 
-smFISH_data.zip contains an Excel file that includes the mRNA counts per unit area for FLC and PP2A, obtained from analysis of the smFISH images as described in the Methods section of the paper.
+FLC_mRNA_ActD_Decay_Exp2_Dataset.xlsx.zip contains an Excel file that includes the mRNA counts per unit area for FLC, obtained from analysis of the smFISH images as described in the Methods section of the paper.
 
 The Jupyter notebooks provided can be used to generate the following plots presented in the paper:  
 
-Figure 1 and S1: spliced_unspliced_analysis.ipynb  
+Figures 1, S2, S12: spliced_unspliced_analysis.ipynb  
 
-Figure 2: decay_rates.ipynb  
+Figure 2: FLC_mRNA_decay_rates.ipynb  (Note: FLC_mRNA_ActD_Decay_Exp2_Dataset.xlsx.zip must be unzipped to be used by FLC_mRNA_decay_rates.ipynb)
 
-Figure S2: smFISH_data_boxplot.ipynb  
+Figure 3: maple_et_al_plaNETseq_script.Rmd
 
 Figure 5, S3, S4, S5, S6, S9: flc_intron1_model_parameter_inference.ipynb  
 
