@@ -1,4 +1,6 @@
-# FLC_intron1_model_fitting
+# Co-transcriptional splicing changes combine with reduced productive transcription initiation for cold-induced repression of FLC
+# Robert Maple†, Govind Menon†, Susan Duncan , Anna Schulten, Maria Sindalovskaya, Hongchun Yang, Rebecca Bloomer, Martin Howard, Caroline Dean
+
 Python and R code and associated data files used to perform data analysis, model parameter inference, and creating plots for figures in Maple et al., 2025. 
 
 FLC_mRNA_ActD_Decay_Exp1_Dataset.xlsx.zip contains an Excel files containing the mRNA counts per unit area from FLC for the smFISHmRNA decay experiment, obtained as described in the Methods section of the paper and shown in Fig. 2B.
