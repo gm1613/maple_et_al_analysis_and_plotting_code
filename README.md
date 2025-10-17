@@ -5,6 +5,8 @@ FLC_mRNA_ActD_Decay_Exp1_Dataset.xlsx.zip contains an Excel files containing the
 
 FLC_mRNA_ActD_Decay_Exp2_Dataset.xlsx.zip contains an Excel files containing the mRNA counts per unit area from FLC and PP2A for a second smFISHmRNA decay experiment, obtained as described in the Methods section of the paper.
 
+rbloomer_flc_timecourse_NV-7D_relUBC_NVrepscombined.txt contains the qPCR timecourse data shown in Fig. S12.
+
 The Jupyter notebooks provided can be used to generate the following plots presented in the paper:  
 
 Figures 1, S2, S12: spliced_unspliced_analysis.ipynb  
