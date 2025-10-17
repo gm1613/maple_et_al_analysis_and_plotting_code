@@ -1,5 +1,5 @@
 # Co-transcriptional splicing changes combine with reduced productive transcription initiation for cold-induced repression of FLC
-# Robert Maple†, Govind Menon†, Susan Duncan , Anna Schulten, Maria Sindalovskaya, Hongchun Yang, Rebecca Bloomer, Martin Howard, Caroline Dean
+## Robert Maple†, Govind Menon†, Susan Duncan , Anna Schulten, Maria Sindalovskaya, Hongchun Yang, Rebecca Bloomer, Martin Howard, Caroline Dean
 
 Python and R code and associated data files used to perform data analysis, model parameter inference, and creating plots for figures in Maple et al., 2025. 
 
